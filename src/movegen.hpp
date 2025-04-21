@@ -32,6 +32,25 @@ inline auto movegen::init_squares_between() {
     return squares_between_bb;
 }
 
+inline auto movegen::init_squares_line() {
+    std::array<std::array<Bitboard, 64>, 64> squares_line_bb{};
+
+    auto att = [](PieceType pt, Square sq, Bitboard occ) {
+        return (pt == PieceType::BISHOP) ? attacks::bishop(sq, occ) : attacks::rook(sq, occ);
+    };
+
+    for (int sq1 = 0; sq1 < 64; ++sq1) {
+        for (PieceType pt : {PieceType::BISHOP, PieceType::ROOK}) {
+            for (int sq2 = 0; sq2 < 64; ++sq2) {
+                if (att(pt, sq1, 0).check(sq2))
+                    squares_line_bb[sq1][sq2] = (att(pt, sq1, 0) & att(pt, sq2, 0)).set(sq1).set(sq2);
+            }
+        }
+    }
+
+    return squares_line_bb;
+}
+
 template <Color::underlying c>
 [[nodiscard]] inline std::pair<Bitboard, int> movegen::checkMask(const Board &board, Square sq) {
     const auto opp_knight = board.pieces(PieceType::KNIGHT, ~c);
@@ -94,7 +113,11 @@ template <Color::underlying c, PieceType::underlying pt>
 
     while (pt_attacks) {
         const auto possible_pin = between(sq, pt_attacks.pop());
+#if __cpp_lib_int_pow2 >= 202002L
+        if (std::has_single_bit((possible_pin & occ_us).getBits())) pin |= possible_pin;
+#else
         if ((possible_pin & occ_us).count() == 1) pin |= possible_pin;
+#endif
     }
 
     return pin;
@@ -394,15 +417,16 @@ inline void movegen::legalmoves(Movelist &movelist, const Board &board, int piec
     */
     auto king_sq = board.kingSq(c);
 
-    Bitboard occ_us  = board.us(c);
-    Bitboard occ_opp = board.us(~c);
-    Bitboard occ_all = occ_us | occ_opp;
+    const auto occ_us    = board.us(c);
+    const auto occ_opp   = board.us(~c);
+    const auto occ_all   = occ_us | occ_opp;
+    const auto opp_empty = ~occ_us;
 
-    Bitboard opp_empty = ~occ_us;
-
-    const auto [checkmask, checks] = checkMask<c>(board, king_sq);
-    const auto pin_hv              = pinMask<c, PieceType::ROOK>(board, king_sq, occ_opp, occ_us);
-    const auto pin_d               = pinMask<c, PieceType::BISHOP>(board, king_sq, occ_opp, occ_us);
+    const auto &st       = board.cstate();
+    const auto checkmask = st.checkmask_;
+    const auto pin_hv    = st.pin_hv_;
+    const auto pin_d     = st.pin_d_;
+    const auto checks    = st.checks_;
 
     assert(checks <= 2);
 
@@ -485,20 +509,21 @@ inline void movegen::legalmoves(Movelist &movelist, const Board &board, int piec
         legalmoves<Color::BLACK, mt>(movelist, board, pieces);
 }
 
+// We cannot use the pre-calculated check parameter here,
+// because this function is used in makeMove.
 template <Color::underlying c>
 inline bool movegen::isEpSquareValid(const Board &board, Square ep) {
     const auto stm = board.sideToMove();
 
-    Bitboard occ_us  = board.us(stm);
-    Bitboard occ_opp = board.us(~stm);
-    auto king_sq     = board.kingSq(stm);
+    const auto occ_us  = board.us(stm);
+    const auto occ_opp = board.us(~stm);
+    const auto king_sq = board.kingSq(stm);
 
-    const auto [checkmask, checks] = movegen::checkMask<c>(board, king_sq);
-    const auto pin_hv              = movegen::pinMask<c, PieceType::ROOK>(board, king_sq, occ_opp, occ_us);
-    const auto pin_d               = movegen::pinMask<c, PieceType::BISHOP>(board, king_sq, occ_opp, occ_us);
+    const auto [checkmask, _] = movegen::checkMask<c>(board, king_sq);
+    const auto pin_hv         = movegen::pinMask<c, PieceType::ROOK>(board, king_sq, occ_opp, occ_us);
+    const auto pin_d          = movegen::pinMask<c, PieceType::BISHOP>(board, king_sq, occ_opp, occ_us);
 
-    const auto pawns    = board.pieces(PieceType::PAWN, stm);
-    const auto pawns_lr = pawns & ~pin_hv;
+    const auto pawns_lr = board.pieces(PieceType::PAWN, stm) & ~pin_hv;
     const auto m        = movegen::generateEPMove(board, checkmask, pin_d, pawns_lr, ep, stm);
     bool found          = false;
 
@@ -516,9 +541,17 @@ inline bool movegen::isEpSquareValid(const Board &board, Square ep) {
     return SQUARES_BETWEEN_BB[sq1.index()][sq2.index()];
 }
 
+[[nodiscard]] inline Bitboard movegen::line(Square sq1, Square sq2) noexcept {
+    return SQUARES_LINE_BB[sq1.index()][sq2.index()];
+}
+
 inline const std::array<std::array<Bitboard, 64>, 64> movegen::SQUARES_BETWEEN_BB = [] {
     attacks::initAttacks();
     return movegen::init_squares_between();
+}();
+
+inline const std::array<std::array<Bitboard, 64>, 64> movegen::SQUARES_LINE_BB = [] {
+    return movegen::init_squares_line();
 }();
 
 }  // namespace chess

@@ -64,10 +64,10 @@ class uci {
             return Move::NO_MOVE;
         }
 
-        auto pt = board.at(source).type();
+        auto pt = board.at<PieceType>(source);
 
         // castling in chess960
-        if (board.chess960() && pt == PieceType::KING && board.at(target).type() == PieceType::ROOK &&
+        if (board.chess960() && pt == PieceType::KING && board.at<PieceType>(target) == PieceType::ROOK &&
             board.at(target).color() == board.sideToMove()) {
             return Move::make<Move::CASTLING>(source, target);
         }
@@ -421,7 +421,7 @@ class uci {
             return;
         }
 
-        const PieceType pt   = board.at(move.from()).type();
+        const PieceType pt   = board.at<PieceType>(move.from());
         const bool isCapture = board.at(move.to()) != Piece::NONE || move.typeOf() == Move::ENPASSANT;
 
         assert(pt != PieceType::NONE);

@@ -36,7 +36,9 @@ class movegen {
 
    private:
     static auto init_squares_between();
+    static auto init_squares_line();
     static const std::array<std::array<Bitboard, 64>, 64> SQUARES_BETWEEN_BB;
+    static const std::array<std::array<Bitboard, 64>, 64> SQUARES_LINE_BB;
 
     // Generate the checkmask. Returns a bitboard where the attacker path between the king and enemy piece is set.
     template <Color::underlying c>
@@ -83,6 +85,7 @@ class movegen {
     static bool isEpSquareValid(const Board &board, Square ep);
 
     [[nodiscard]] static Bitboard between(Square sq1, Square sq2) noexcept;
+    [[nodiscard]] static Bitboard line(Square sq1, Square sq2) noexcept;
 
     friend class Board;
 };
