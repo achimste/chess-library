@@ -411,7 +411,7 @@ class Square {
     [[nodiscard]] constexpr bool is_dark() const noexcept { return !is_light(); }
 
     /**
-     * @brief Check if the square is vali.d
+     * @brief Check if the square is valid.
      * @return
      */
     [[nodiscard]] constexpr bool is_valid() const noexcept { return static_cast<std::int8_t>(sq) < 64; }
