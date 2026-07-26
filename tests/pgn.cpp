@@ -569,6 +569,20 @@ TEST_SUITE("PGN StreamParser") {
         CHECK(vis->count() == 0);
     }
 
+    TEST_CASE("Leading whitespace before header") {
+        const auto file  = "./tests/pgns/leading_whitespace.pgn";
+        auto file_stream = std::ifstream(file);
+
+        auto vis = std::make_unique<MyVisitor2>();
+        SmallBufferStreamParser parser(file_stream);
+        const auto error = parser.readGames(*vis);
+
+        CHECK(error == pgn::StreamParserError::None);
+        CHECK(vis->headers()[0] == "Event Batch 10: s20red4c4_t3 vs master");
+        CHECK(vis->headers()[4] == "White New-cfe8ce842c");
+        CHECK(vis->moves()[0] == "Bg2");
+    }
+
     TEST_CASE("Keep track of opening square bracket") {
         const auto file  = "./tests/pgns/square_bracket_in_header.pgn";
         auto file_stream = std::ifstream(file);
